@@ -59,6 +59,10 @@ def test_request_kwargs_override_priority():
     req = client._build_request_kwargs([{"role": "user", "content": "hi"}])
     assert req["temperature"] == 1
     assert req["reasoning_effort"] == "high"
+    preview = client.preview_request_kwargs()
+    assert preview["temperature"] == 1
+    assert preview["reasoning_effort"] == "high"
+    assert preview["messages"].startswith("<omitted")
 
 
 def test_append_api_call_log(tmp_path: Path):

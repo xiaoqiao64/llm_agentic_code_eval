@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import json
 import time
 from pathlib import Path
 
 from rich.console import Console
 from rich.table import Table
 
+from agent_eval.agent.tools import OPENAI_TOOL_SPECS
 from agent_eval.config import load_config, parse_dot_kwargs
 from agent_eval.harness.runner import TaskRunner
 from agent_eval.llm.client import LLMClient
@@ -49,7 +51,7 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     run.add_argument(
-        "--print-api-call-file",
+        "--print_api_call_file",
         type=Path,
         default=None,
         help="Append each chat completion request/response as JSON to this file",
@@ -76,7 +78,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Extra chat completion kwargs (highest priority); see run --help",
     )
     matrix.add_argument(
-        "--print-api-call-file",
+        "--print_api_call_file",
         type=Path,
         default=None,
         help="Append each chat completion request/response as JSON to this file",
@@ -130,10 +132,15 @@ def _run_eval(config_path: Path | None, overrides: dict, output_dir: Path) -> Ev
     trajectories_dir = output_dir / "trajectories"
     runner = TaskRunner(config, trajectories_dir=trajectories_dir)
 
+    tools = OPENAI_TOOL_SPECS if config.tool_mode == "openai" else None
+    request_preview = llm.preview_request_kwargs(tools=tools)
+
     console.print(
         f"[bold]Running {len(tasks)} tasks[/bold] "
         f"(model={config.model}, {thinking_label})"
     )
+    console.print("[dim]Effective chat completion request parameters:[/dim]")
+    console.print(json.dumps(request_preview, ensure_ascii=False, indent=2))
 
     started_at = now_iso()
     start = time.perf_counter()

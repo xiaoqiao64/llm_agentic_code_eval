@@ -118,6 +118,22 @@ class LLMClient:
 
         return kwargs
 
+    def preview_request_kwargs(
+        self,
+        *,
+        tools: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        """Merged chat.completions kwargs (messages/tools bodies shortened for display)."""
+        kwargs = self._build_request_kwargs(
+            [{"role": "user", "content": "<omitted>"}],
+            tools=tools,
+        )
+        preview: dict[str, Any] = dict(kwargs)
+        preview["messages"] = "<omitted; conversation grows each turn>"
+        if tools is not None and "tools" in preview:
+            preview["tools"] = f"<{len(tools)} OpenAI function specs>"
+        return preview
+
     def chat(
         self,
         messages: list[dict[str, Any]],
