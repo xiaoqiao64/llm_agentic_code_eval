@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 from dataclasses import dataclass, field
@@ -51,6 +52,8 @@ def append_api_call_log(
         with path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False, indent=2))
             f.write("\n\n")
+            f.flush()
+            os.fsync(f.fileno())
 
 
 @dataclass
