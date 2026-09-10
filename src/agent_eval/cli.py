@@ -7,7 +7,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.table import Table
 
-from agent_eval.config import load_config
+from agent_eval.config import load_config, parse_dot_kwargs
 from agent_eval.harness.runner import TaskRunner
 from agent_eval.llm.client import LLMClient
 from agent_eval.report.reporter import EvalReport, now_iso, write_matrix_summary, write_report
@@ -37,6 +37,23 @@ def _build_parser() -> argparse.ArgumentParser:
     run.add_argument("--max-turns", type=int, default=None)
     run.add_argument("--output", type=Path, default=None)
     run.add_argument("--seed", type=int, default=None)
+    run.add_argument(
+        "--kwargs",
+        action="append",
+        default=None,
+        metavar="KEY=VALUE",
+        help=(
+            "Extra chat completion kwargs (highest priority). "
+            "Use dot paths for nesting, e.g. "
+            "extra_body.chat_template_kwargs.enable_thinking=True"
+        ),
+    )
+    run.add_argument(
+        "--print-api-call-file",
+        type=Path,
+        default=None,
+        help="Append each chat completion request/response as JSON to this file",
+    )
 
     matrix = sub.add_parser("matrix", help="Run multiple thinking presets")
     matrix.add_argument("--config", type=Path, default=None)
@@ -51,6 +68,19 @@ def _build_parser() -> argparse.ArgumentParser:
     matrix.add_argument("--max-turns", type=int, default=None)
     matrix.add_argument("--output", type=Path, default=Path("results/matrix"))
     matrix.add_argument("--seed", type=int, default=None)
+    matrix.add_argument(
+        "--kwargs",
+        action="append",
+        default=None,
+        metavar="KEY=VALUE",
+        help="Extra chat completion kwargs (highest priority); see run --help",
+    )
+    matrix.add_argument(
+        "--print-api-call-file",
+        type=Path,
+        default=None,
+        help="Append each chat completion request/response as JSON to this file",
+    )
 
     sub.add_parser("list-tasks", help="List available tasks")
     return parser
@@ -82,6 +112,10 @@ def _parse_overrides(args: argparse.Namespace) -> dict:
         overrides["output_dir"] = args.output
     if getattr(args, "seed", None) is not None:
         overrides["seed"] = args.seed
+    if getattr(args, "kwargs", None):
+        overrides["request_kwargs"] = parse_dot_kwargs(args.kwargs)
+    if getattr(args, "print_api_call_file", None):
+        overrides["print_api_call_file"] = args.print_api_call_file
     return overrides
 
 

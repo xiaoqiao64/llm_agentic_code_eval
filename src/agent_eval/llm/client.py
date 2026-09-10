@@ -1,12 +1,56 @@
 from __future__ import annotations
 
+import json
+import threading
 import time
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from openai import OpenAI
 
-from agent_eval.config import EvalConfig, ThinkingPreset
+from agent_eval.config import EvalConfig, ThinkingPreset, deep_merge
+
+_api_log_lock = threading.Lock()
+_api_log_counter = 0
+
+
+def _next_api_log_index() -> int:
+    global _api_log_counter
+    with _api_log_lock:
+        _api_log_counter += 1
+        return _api_log_counter
+
+
+def _response_to_dict(response: Any) -> dict[str, Any]:
+    if hasattr(response, "model_dump"):
+        return response.model_dump()
+    return {"repr": repr(response)}
+
+
+def append_api_call_log(
+    path: Path,
+    request_kwargs: dict[str, Any],
+    response: Any | None,
+    latency_sec: float,
+    error: str | None = None,
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    entry: dict[str, Any] = {
+        "call_index": _next_api_log_index(),
+        "timestamp": datetime.now(UTC).isoformat(),
+        "latency_sec": latency_sec,
+        "request": request_kwargs,
+    }
+    if error is not None:
+        entry["error"] = error
+    elif response is not None:
+        entry["response"] = _response_to_dict(response)
+    with _api_log_lock:
+        with path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False, indent=2))
+            f.write("\n\n")
 
 
 @dataclass
@@ -34,6 +78,7 @@ class LLMClient:
             api_key=config.api_key,
         )
         self.thinking = config.resolved_thinking()
+        self._print_api_call_file = config.print_api_call_file
 
     def _build_request_kwargs(
         self,
@@ -68,6 +113,9 @@ class LLMClient:
             kwargs["tools"] = tools
             kwargs["tool_choice"] = "auto"
 
+        if self.config.request_kwargs:
+            kwargs = deep_merge(kwargs, self.config.request_kwargs)
+
         return kwargs
 
     def chat(
@@ -77,8 +125,25 @@ class LLMClient:
     ) -> ChatResult:
         kwargs = self._build_request_kwargs(messages, tools)
         start = time.perf_counter()
-        response = self.client.chat.completions.create(**kwargs)
+        try:
+            response = self.client.chat.completions.create(**kwargs)
+        except Exception as exc:
+            latency = time.perf_counter() - start
+            if self._print_api_call_file is not None:
+                append_api_call_log(
+                    self._print_api_call_file,
+                    kwargs,
+                    None,
+                    latency,
+                    error=str(exc),
+                )
+            raise
         latency = time.perf_counter() - start
+
+        if self._print_api_call_file is not None:
+            append_api_call_log(
+                self._print_api_call_file, kwargs, response, latency
+            )
 
         choice = response.choices[0].message
         content = choice.content or ""
