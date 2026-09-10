@@ -1,0 +1,8 @@
+prompt: |
+  Implement parse_log_line in log_parser.py according to SPEC.md.
+  Each log line format: "TIMESTAMP LEVEL message" where TIMESTAMP is ISO8601,
+  LEVEL is INFO/WARN/ERROR, and message is the rest. Return a dict with keys
+  timestamp, level, message. Return None for invalid lines.
+verify_cmd: pytest verify/ -q
+timeout_sec: 240
+max_turns: 20

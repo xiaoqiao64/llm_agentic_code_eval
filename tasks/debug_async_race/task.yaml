@@ -1,0 +1,6 @@
+prompt: |
+  counter.py has a race condition causing test_increment_concurrent to fail
+  intermittently. Fix the code so concurrent increments are correct.
+verify_cmd: pytest verify/ -q
+timeout_sec: 240
+max_turns: 20

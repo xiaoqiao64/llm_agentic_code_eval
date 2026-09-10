@@ -1,0 +1,8 @@
+prompt: |
+  Implement LRUCache in lru_cache.py with get(key), put(key, value), and
+  size(). Capacity is set at construction. get returns None for missing keys
+  and marks the key as recently used. put evicts the least recently used item
+  when over capacity. All operations should be O(1) average.
+verify_cmd: pytest verify/ -q
+timeout_sec: 240
+max_turns: 20

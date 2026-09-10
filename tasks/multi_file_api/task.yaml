@@ -1,0 +1,6 @@
+prompt: |
+  Complete the FastAPI app in app/main.py and app/routes.py so all tests pass.
+  Implement GET /health -> {"status":"ok"} and GET /items -> list from store.py.
+verify_cmd: pytest verify/ -q
+timeout_sec: 240
+max_turns: 20

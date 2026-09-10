@@ -1,0 +1,7 @@
+prompt: |
+  Add a retry(max_attempts, exceptions) decorator in retry.py and apply it to
+  fetch_data() in api_client.py so flaky calls succeed after retries.
+  Do not change the test file. Run pytest to verify.
+verify_cmd: pytest verify/ -q
+timeout_sec: 240
+max_turns: 20

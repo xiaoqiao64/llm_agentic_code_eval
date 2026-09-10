@@ -1,0 +1,6 @@
+prompt: |
+  The file counter.py has a bug. Run tests with `pytest` to see the failure,
+  then fix the bug so all tests pass. Only modify files in the workspace.
+verify_cmd: pytest verify/ -q
+timeout_sec: 240
+max_turns: 20

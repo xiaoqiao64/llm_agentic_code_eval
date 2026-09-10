@@ -1,0 +1,7 @@
+prompt: |
+  Implement csv_stats.py: a CLI that reads data.csv and prints "count=N sum=S
+  avg=A" for the "value" column (one decimal for avg). Usage:
+  python csv_stats.py data.csv
+verify_cmd: pytest verify/ -q
+timeout_sec: 240
+max_turns: 20

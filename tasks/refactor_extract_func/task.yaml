@@ -1,0 +1,7 @@
+prompt: |
+  Refactor processor.py: extract the discount calculation into a separate
+  function calculate_discount(price, tier) in discounts.py without changing
+  behavior. All tests must still pass.
+verify_cmd: pytest verify/ -q
+timeout_sec: 240
+max_turns: 20

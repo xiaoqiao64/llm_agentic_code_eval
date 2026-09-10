@@ -1,0 +1,7 @@
+prompt: |
+  The project fails to import due to a circular dependency between models.py
+  and serializers.py. Fix the import cycle without changing public behavior.
+  Run pytest to verify.
+verify_cmd: pytest verify/ -q
+timeout_sec: 240
+max_turns: 20

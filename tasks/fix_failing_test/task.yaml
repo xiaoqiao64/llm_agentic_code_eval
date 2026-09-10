@@ -1,0 +1,6 @@
+prompt: |
+  The tests in this project are already written. Implement fibonacci(n) in
+  fib.py so that all tests pass. Use an efficient approach for n up to 30.
+verify_cmd: pytest verify/ -q
+timeout_sec: 240
+max_turns: 20

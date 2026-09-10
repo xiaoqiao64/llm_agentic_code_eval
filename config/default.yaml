@@ -1,0 +1,47 @@
+base_url: "http://localhost:8080/v1"
+model: "Qwen3.8-27B"
+api_key: "EMPTY"
+
+reasoning_backend: reasoning_effort
+
+thinking_presets:
+  off:
+    reasoning_effort: null
+    extra_body:
+      chat_template_kwargs:
+        enable_thinking: false
+  low:
+    reasoning_effort: low
+  medium:
+    reasoning_effort: medium
+  xhigh:
+    reasoning_effort: xhigh
+  budget_512:
+    extra_body:
+      thinking_token_budget: 512
+
+default_thinking_preset: low
+tool_mode: text
+profile: quick
+task_timeout_sec: 240
+max_turns: 20
+temperature: 0.2
+max_tokens: 4096
+seed: null
+
+profiles:
+  smoke:
+    - fix_counter_bug
+    - implement_parse_log
+    - fix_failing_test
+  quick:
+    - fix_counter_bug
+    - implement_parse_log
+    - add_retry_decorator
+    - fix_import_cycle
+    - implement_lru_cache
+    - fix_failing_test
+    - cli_csv_stats
+    - refactor_extract_func
+    - debug_async_race
+    - multi_file_api
