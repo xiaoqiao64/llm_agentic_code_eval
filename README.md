@@ -27,9 +27,12 @@ pip install -e .
 agent-eval run \
   --base-url http://localhost:8800/v1 \
   --model Qwen3.8-27B \
+  --api-key YOUR_API_KEY \
   --thinking-preset low \
   --profile quick
 ```
+
+本地 llama.cpp 等常用占位密钥 `EMPTY`，也可在 [`config/default.yaml`](config/default.yaml) 里设置 `api_key`，或用 `--api-key` / `--api_key` 传入。
 
 ### Smoke 测试（约 10 分钟，3 个任务）
 
