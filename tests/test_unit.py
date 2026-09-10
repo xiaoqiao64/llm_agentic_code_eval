@@ -3,7 +3,12 @@ from pathlib import Path
 from agent_eval.agent.parser import parse_text_tool_calls
 from agent_eval.agent.tools import ToolExecutor
 from agent_eval.config import deep_merge, load_config, parse_dot_kwargs
-from agent_eval.llm.client import LLMClient, append_api_call_log
+from agent_eval.llm.client import (
+    LLMClient,
+    append_api_call_log,
+    estimate_reasoning_tokens,
+    reasoning_tokens_from_usage,
+)
 
 
 def test_parse_text_tool_calls():
@@ -86,3 +91,18 @@ def test_deep_merge_nested_extra_body():
     )
     merged = deep_merge(base, override)
     assert merged["extra_body"]["chat_template_kwargs"]["enable_thinking"] is True
+
+
+def test_reasoning_tokens_from_usage_top_level():
+    class Usage:
+        completion_tokens_details = None
+        reasoning_tokens = 42
+
+    assert reasoning_tokens_from_usage(Usage()) == 42
+
+
+def test_reasoning_tokens_estimate_when_usage_zero():
+    usage = type("U", (), {"completion_tokens_details": None, "reasoning_tokens": 0})()
+    assert reasoning_tokens_from_usage(usage) == 0
+    text = "Let me check if there's a tests directory."
+    assert estimate_reasoning_tokens(text) > 0

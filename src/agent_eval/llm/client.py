@@ -56,6 +56,35 @@ def append_api_call_log(
             os.fsync(f.fileno())
 
 
+def reasoning_tokens_from_usage(usage: Any | None) -> int:
+    if usage is None:
+        return 0
+    details = getattr(usage, "completion_tokens_details", None)
+    if details:
+        n = getattr(details, "reasoning_tokens", None)
+        if n:
+            return int(n)
+    n = getattr(usage, "reasoning_tokens", None)
+    if n:
+        return int(n)
+    if hasattr(usage, "model_dump"):
+        data = usage.model_dump()
+        if data.get("reasoning_tokens"):
+            return int(data["reasoning_tokens"])
+        ctd = data.get("completion_tokens_details") or {}
+        if isinstance(ctd, dict) and ctd.get("reasoning_tokens"):
+            return int(ctd["reasoning_tokens"])
+    return 0
+
+
+def estimate_reasoning_tokens(reasoning_content: str) -> int:
+    """Fallback when the API returns reasoning_content but usage.reasoning_tokens is 0."""
+    text = reasoning_content.strip()
+    if not text:
+        return 0
+    return max(1, (len(text.encode("utf-8")) + 3) // 4)
+
+
 @dataclass
 class ChatMetrics:
     latency_sec: float = 0.0
@@ -157,9 +186,9 @@ class LLMClient:
             metrics.prompt_tokens = response.usage.prompt_tokens or 0
             metrics.completion_tokens = response.usage.completion_tokens or 0
             metrics.total_tokens = response.usage.total_tokens or 0
-            details = getattr(response.usage, "completion_tokens_details", None)
-            if details:
-                metrics.reasoning_tokens = getattr(details, "reasoning_tokens", 0) or 0
+            metrics.reasoning_tokens = reasoning_tokens_from_usage(response.usage)
+        if metrics.reasoning_tokens == 0 and reasoning_content.strip():
+            metrics.reasoning_tokens = estimate_reasoning_tokens(reasoning_content)
 
         tool_calls: list[dict[str, Any]] = []
         if choice.tool_calls:
@@ -187,6 +216,9 @@ class LLMClient:
         extra = kw.get("extra_body") or {}
         if budget := extra.get("thinking_token_budget"):
             parts.append(f"thinking_token_budget={budget}")
+        thinking = extra.get("thinking")
+        if isinstance(thinking, dict) and thinking.get("type"):
+            parts.append(f"thinking.type={thinking['type']}")
         ctk = extra.get("chat_template_kwargs") or {}
         if "enable_thinking" in ctk:
             parts.append(f"enable_thinking={ctk['enable_thinking']}")

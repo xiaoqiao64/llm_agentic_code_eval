@@ -259,7 +259,7 @@ CLI：`--kwargs extra_body.chat_template_kwargs.enable_thinking=False`
 
 - `latency_sec`：端到端延迟
 - `prompt_tokens` / `completion_tokens` / `total_tokens`
-- `reasoning_tokens`：从 `usage.completion_tokens_details.reasoning_tokens` 提取（若 API 支持）
+- `reasoning_tokens`：优先 `usage.completion_tokens_details.reasoning_tokens` 或顶层 `usage.reasoning_tokens`；若仍为 0 但返回了 `reasoning_content`，按 UTF-8 长度粗估（约 4 字节/token）
 
 ---
 
