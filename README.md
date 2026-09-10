@@ -1,0 +1,2 @@
+# llm_agentic_code_eval
+快速评估LLM agent写代码能力的评测集合，力求30分钟内跑完议论评测
