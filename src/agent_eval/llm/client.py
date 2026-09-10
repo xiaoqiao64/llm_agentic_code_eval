@@ -11,7 +11,7 @@ from typing import Any
 
 from openai import OpenAI
 
-from agent_eval.config import EvalConfig, ThinkingPreset, deep_merge
+from agent_eval.config import EvalConfig, deep_merge
 
 _api_log_lock = threading.Lock()
 _api_log_counter = 0
@@ -80,7 +80,6 @@ class LLMClient:
             base_url=config.base_url,
             api_key=config.api_key,
         )
-        self.thinking = config.resolved_thinking()
         self._print_api_call_file = config.print_api_call_file
 
     def _build_request_kwargs(
@@ -96,21 +95,6 @@ class LLMClient:
         }
         if self.config.seed is not None:
             kwargs["seed"] = self.config.seed
-
-        extra_body: dict[str, Any] = dict(self.thinking.extra_body)
-
-        if self.thinking.reasoning_effort is not None:
-            kwargs["reasoning_effort"] = self.thinking.reasoning_effort
-        elif (
-            self.config.reasoning_backend == "chat_template"
-            and "chat_template_kwargs" not in extra_body
-        ):
-            extra_body.setdefault(
-                "chat_template_kwargs", {"enable_thinking": True}
-            )
-
-        if extra_body:
-            kwargs["extra_body"] = extra_body
 
         if tools:
             kwargs["tools"] = tools
@@ -196,12 +180,14 @@ class LLMClient:
         )
 
     def thinking_label(self) -> str:
-        if self.thinking.reasoning_effort:
-            return f"reasoning_effort={self.thinking.reasoning_effort}"
-        budget = self.thinking.extra_body.get("thinking_token_budget")
-        if budget:
-            return f"thinking_token_budget={budget}"
-        ctk = self.thinking.extra_body.get("chat_template_kwargs", {})
-        if ctk.get("enable_thinking") is False:
-            return "thinking=off"
-        return "thinking=default"
+        kw = self._build_request_kwargs([{"role": "user", "content": ""}])
+        parts: list[str] = []
+        if "reasoning_effort" in kw:
+            parts.append(f"reasoning_effort={kw['reasoning_effort']}")
+        extra = kw.get("extra_body") or {}
+        if budget := extra.get("thinking_token_budget"):
+            parts.append(f"thinking_token_budget={budget}")
+        ctk = extra.get("chat_template_kwargs") or {}
+        if "enable_thinking" in ctk:
+            parts.append(f"enable_thinking={ctk['enable_thinking']}")
+        return ", ".join(parts) if parts else "default"

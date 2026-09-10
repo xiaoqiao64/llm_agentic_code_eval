@@ -17,7 +17,7 @@
 | **Agent 导向** | 评测多轮读/写/运行/调试，而非单轮代码补全 |
 | **快速** | quick profile 10 个任务，目标约 30 分钟跑完 |
 | **本地友好** | 对接 llama.cpp / vLLM 等 OpenAI 兼容 API |
-| **可对比** | 支持 thinking preset 矩阵，输出通过率 + 耗时 + token |
+| **可对比** | 固定 profile / 任务集，输出通过率 + 耗时 + token；可用不同 `request_kwargs` 多次 run 对比 |
 | **可诊断** | 保存完整 trajectory，定位失败步骤 |
 
 ### 1.3 核心指标
@@ -57,7 +57,7 @@
 
 ```
 llm_agentic_code_eval/
-├── config/default.yaml          # 默认配置（API、preset、profile）
+├── config/default.yaml          # 默认配置（API、profile、request_kwargs）
 ├── docs/TECHNICAL.md            # 本文档
 ├── src/agent_eval/
 │   ├── cli.py                   # 命令行入口
@@ -83,9 +83,9 @@ llm_agentic_code_eval/
 
 | 模块 | 文件 | 职责 |
 |------|------|------|
-| CLI | `cli.py` | 解析参数，调度 `run` / `matrix` / `list-tasks` |
-| Config | `config.py` | 加载 YAML，合并 CLI 覆盖，解析 thinking preset 与 profile |
-| LLM | `llm/client.py` | 封装 OpenAI SDK，注入 `reasoning_effort` / `extra_body` |
+| CLI | `cli.py` | 解析参数，调度 `run` / `list-tasks` |
+| Config | `config.py` | 加载 YAML，合并 CLI 覆盖，解析 profile 与 `request_kwargs` |
+| LLM | `llm/client.py` | 封装 OpenAI SDK，合并 `request_kwargs` 到 chat completion |
 | Agent | `agent/loop.py` | 多轮对话循环，解析工具调用，维护消息历史 |
 | Tools | `agent/tools.py` | 在隔离 workspace 内执行 read/write/edit/run |
 | Harness | `harness/runner.py` | 串联 Agent → 验证 → 报告，管理生命周期 |
@@ -213,13 +213,11 @@ client = OpenAI(base_url="http://localhost:8080/v1", api_key="EMPTY")
 response = client.chat.completions.create(model=..., messages=..., ...)
 ```
 
-### 5.2 Thinking / Reasoning 配置
+### 5.2 Thinking / Reasoning 参数
 
-支持两条路径，由 `reasoning_backend` 配置项选择：
+不内置 preset；由 **`request_kwargs`**（YAML）与 **`--kwargs`**（CLI，优先级更高）原样合并进请求。常见写法示例：
 
-#### 路径 1：reasoning_effort（Qwen3.8 + llama.cpp）
-
-请求体顶层字段：
+#### reasoning_effort（Qwen3.8 + llama.cpp）
 
 ```json
 {
@@ -229,9 +227,9 @@ response = client.chat.completions.create(model=..., messages=..., ...)
 }
 ```
 
-可选值：`low` | `medium` | `xhigh`
+CLI：`--kwargs reasoning_effort=low` 或 YAML `request_kwargs.reasoning_effort: low`
 
-#### 路径 2：chat_template_kwargs（vLLM Qwen3 fallback）
+#### chat_template_kwargs（vLLM Qwen3 等）
 
 ```json
 {
@@ -241,7 +239,9 @@ response = client.chat.completions.create(model=..., messages=..., ...)
 }
 ```
 
-#### 路径 3：thinking_token_budget
+CLI：`--kwargs extra_body.chat_template_kwargs.enable_thinking=False`
+
+#### thinking_token_budget
 
 ```json
 {
@@ -251,23 +251,9 @@ response = client.chat.completions.create(model=..., messages=..., ...)
 }
 ```
 
-### 5.3 Preset 解析优先级
+启动 run 时会打印合并后的 **Effective chat completion request parameters**；`summary.json` 中的 `thinking_label` 从最终请求里提取 `reasoning_effort` / thinking 相关 `extra_body` 字段摘要。
 
-```
-CLI --reasoning-effort  >  CLI --thinking-preset  >  config default_thinking_preset
-```
-
-`config/default.yaml` 中定义的 preset：
-
-| Preset | 实际请求参数 |
-|--------|-------------|
-| `off` | `enable_thinking: false` |
-| `low` | `reasoning_effort: low` |
-| `medium` | `reasoning_effort: medium` |
-| `xhigh` | `reasoning_effort: xhigh` |
-| `budget_512` | `thinking_token_budget: 512` |
-
-### 5.4 指标采集
+### 5.3 指标采集
 
 每次 `chat()` 调用记录：
 
@@ -340,7 +326,7 @@ max_turns: 20          # 最大 Agent 轮次
 
 ```
 results/
-└── 20260909_220000/           # 或 matrix/low/
+└── 20260909_220000/
     ├── summary.json           # 机器可读完整报告
     ├── summary.md             # 人类可读表格
     └── trajectories/
@@ -372,18 +358,6 @@ results/
 }
 ```
 
-### 7.3 矩阵对比（`agent-eval matrix`）
-
-对多个 thinking preset 依次执行完整评测，生成：
-
-```
-results/matrix/
-├── low/summary.md
-├── medium/summary.md
-├── xhigh/summary.md
-└── matrix_summary.md    # 横向对比表
-```
-
 ---
 
 ## 8. 配置参考
@@ -395,8 +369,7 @@ results/matrix/
 | `base_url` | `http://localhost:8080/v1` | API 地址 |
 | `model` | `Qwen3.8-27B` | 模型名称 |
 | `api_key` | `EMPTY` | API 密钥 |
-| `reasoning_backend` | `reasoning_effort` | thinking 注入方式 |
-| `default_thinking_preset` | `low` | 默认 preset |
+| `request_kwargs` | `{}` | 合并进 chat completion 的额外字段 |
 | `tool_mode` | `text` | 工具调用协议 |
 | `profile` | `quick` | 任务分组 |
 | `task_timeout_sec` | `240` | 单任务超时 |
@@ -410,15 +383,12 @@ results/matrix/
 CLI 参数优先级高于 YAML 配置文件。常用组合：
 
 ```bash
-# 指定模型与 thinking
+# 指定模型与 reasoning
 agent-eval run --base-url http://localhost:8080/v1 \
-  --model Qwen3.8-27B --thinking-preset medium
+  --model Qwen3.8-27B --kwargs reasoning_effort=medium
 
 # 覆盖单个任务
 agent-eval run --tasks fix_counter_bug --max-turns 10
-
-# 矩阵对比
-agent-eval matrix --presets off,low,medium,xhigh --profile quick
 ```
 
 ---
@@ -434,24 +404,13 @@ agent-eval matrix --presets off,low,medium,xhigh --profile quick
 5. 将任务 ID 加入 `config/default.yaml` 的 profile
 6. 本地验证：手动修复 workspace 后运行 `pytest tasks/<id>/verify -q`
 
-### 9.2 添加新 thinking preset
-
-在 `config/default.yaml` 的 `thinking_presets` 中添加：
-
-```yaml
-thinking_presets:
-  budget_1024:
-    extra_body:
-      thinking_token_budget: 1024
-```
-
-### 9.3 适配其他模型后端
+### 9.2 适配其他模型后端
 
 | 后端 | 建议配置 |
 |------|----------|
-| llama.cpp (Qwen3.8) | `tool_mode: text`, `reasoning_backend: reasoning_effort` |
-| vLLM (Qwen3) | `tool_mode: openai`, `reasoning_backend: chat_template` |
-| 无 thinking 模型 | `thinking_preset: off` |
+| llama.cpp (Qwen3.8) | `tool_mode: text`，`request_kwargs.reasoning_effort` 等 |
+| vLLM (Qwen3) | `tool_mode: openai`，`request_kwargs.extra_body.chat_template_kwargs` |
+| 无 thinking 模型 | 不传 thinking 相关 `request_kwargs` |
 
 ---
 

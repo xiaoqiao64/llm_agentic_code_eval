@@ -12,7 +12,7 @@ from agent_eval.agent.tools import OPENAI_TOOL_SPECS
 from agent_eval.config import load_config, parse_dot_kwargs
 from agent_eval.harness.runner import TaskRunner
 from agent_eval.llm.client import LLMClient
-from agent_eval.report.reporter import EvalReport, now_iso, write_matrix_summary, write_report
+from agent_eval.report.reporter import EvalReport, now_iso, write_report
 from agent_eval.tasks.registry import load_tasks
 
 console = Console()
@@ -30,8 +30,6 @@ def _build_parser() -> argparse.ArgumentParser:
     run.add_argument("--base-url", default=None)
     run.add_argument("--model", default=None)
     run.add_argument("--api-key", "--api_key", default=None)
-    run.add_argument("--thinking-preset", default=None)
-    run.add_argument("--reasoning-effort", default=None)
     run.add_argument("--tool-mode", choices=["text", "openai"], default=None)
     run.add_argument("--profile", default=None)
     run.add_argument("--tasks", default=None, help="Comma-separated task ids")
@@ -51,34 +49,7 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     run.add_argument(
-        "--print_api_call_file",
-        type=Path,
-        default=None,
-        help="Append each chat completion request/response as JSON to this file",
-    )
-
-    matrix = sub.add_parser("matrix", help="Run multiple thinking presets")
-    matrix.add_argument("--config", type=Path, default=None)
-    matrix.add_argument("--base-url", default=None)
-    matrix.add_argument("--model", default=None)
-    matrix.add_argument("--api-key", "--api_key", default=None)
-    matrix.add_argument("--presets", required=True, help="Comma-separated presets")
-    matrix.add_argument("--tool-mode", choices=["text", "openai"], default=None)
-    matrix.add_argument("--profile", default=None)
-    matrix.add_argument("--tasks", default=None)
-    matrix.add_argument("--task-timeout", type=int, default=None)
-    matrix.add_argument("--max-turns", type=int, default=None)
-    matrix.add_argument("--output", type=Path, default=Path("results/matrix"))
-    matrix.add_argument("--seed", type=int, default=None)
-    matrix.add_argument(
-        "--kwargs",
-        action="append",
-        default=None,
-        metavar="KEY=VALUE",
-        help="Extra chat completion kwargs (highest priority); see run --help",
-    )
-    matrix.add_argument(
-        "--print_api_call_file",
+        "--print-api-call-file",
         type=Path,
         default=None,
         help="Append each chat completion request/response as JSON to this file",
@@ -96,10 +67,6 @@ def _parse_overrides(args: argparse.Namespace) -> dict:
         overrides["model"] = args.model
     if getattr(args, "api_key", None):
         overrides["api_key"] = args.api_key
-    if getattr(args, "thinking_preset", None):
-        overrides["thinking_preset"] = args.thinking_preset
-    if getattr(args, "reasoning_effort", None):
-        overrides["reasoning_effort"] = args.reasoning_effort
     if getattr(args, "tool_mode", None):
         overrides["tool_mode"] = args.tool_mode
     if getattr(args, "profile", None):
@@ -177,7 +144,6 @@ def _run_eval(config_path: Path | None, overrides: dict, output_dir: Path) -> Ev
         total_count=len(results),
         pass_rate=pass_count / len(results) if results else 0.0,
         results=results,
-        matrix_label=overrides.get("thinking_preset"),
     )
     json_path, md_path = write_report(report, output_dir)
     console.print(f"\n[bold]Report:[/bold] {md_path} ({json_path})")
@@ -188,19 +154,6 @@ def cmd_run(args: argparse.Namespace) -> None:
     overrides = _parse_overrides(args)
     output_dir = args.output or Path("results") / time.strftime("%Y%m%d_%H%M%S")
     _run_eval(args.config, overrides, output_dir)
-
-
-def cmd_matrix(args: argparse.Namespace) -> None:
-    presets = [p.strip() for p in args.presets.split(",") if p.strip()]
-    reports: list[EvalReport] = []
-    for preset in presets:
-        overrides = _parse_overrides(args)
-        overrides["thinking_preset"] = preset
-        preset_dir = args.output / preset
-        console.rule(f"[bold]Preset: {preset}[/bold]")
-        reports.append(_run_eval(args.config, overrides, preset_dir))
-    matrix_path = write_matrix_summary(reports, args.output)
-    console.print(f"\n[bold]Matrix summary:[/bold] {matrix_path}")
 
 
 def cmd_list_tasks(args: argparse.Namespace) -> None:
@@ -219,8 +172,6 @@ def main() -> None:
     args = parser.parse_args()
     if args.command == "run":
         cmd_run(args)
-    elif args.command == "matrix":
-        cmd_matrix(args)
     elif args.command == "list-tasks":
         cmd_list_tasks(args)
 

@@ -22,7 +22,6 @@ class EvalReport:
     total_count: int
     pass_rate: float
     results: list[TaskResult] = field(default_factory=list)
-    matrix_label: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -69,26 +68,6 @@ def _render_markdown(report: EvalReport) -> str:
     )
     lines.append("")
     return "\n".join(lines)
-
-
-def write_matrix_summary(reports: list[EvalReport], output_dir: Path) -> Path:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    path = output_dir / "matrix_summary.md"
-    lines = [
-        "# Matrix Comparison",
-        "",
-        "| Preset | Pass rate | Total time | Pass count |",
-        "|--------|-----------|------------|------------|",
-    ]
-    for r in reports:
-        label = r.matrix_label or r.thinking_label
-        lines.append(
-            f"| {label} | {r.pass_rate:.0%} | {_fmt_sec(r.total_sec)} | "
-            f"{r.pass_count}/{r.total_count} |"
-        )
-    lines.append("")
-    path.write_text("\n".join(lines), encoding="utf-8")
-    return path
 
 
 def _fmt_sec(seconds: float) -> str:

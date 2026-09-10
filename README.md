@@ -8,9 +8,8 @@
 
 - **8-10 个 Python mini-repo 任务**：修 bug、实现函数、解循环依赖、LRU、CLI、重构、async 竞态、FastAPI
 - **Agent 工具链**：`read_file` / `write_file` / `edit_file` / `run_command`
-- **Thinking 配置**：支持 Qwen3.8 `reasoning_effort`（low / medium / xhigh）与 `thinking_token_budget`
+- **请求参数**：通过 YAML `request_kwargs` 或 `--kwargs` 传入任意 chat completion 字段（如 `reasoning_effort`、thinking 相关 `extra_body`）
 - **报告**：通过率、耗时、轮次、reasoning tokens；JSON + Markdown
-- **矩阵对比**：一次跑多个 thinking preset
 
 ## 安装
 
@@ -28,7 +27,6 @@ agent-eval run \
   --base-url http://localhost:8800/v1 \
   --model Qwen3.8-27B \
   --api-key YOUR_API_KEY \
-  --thinking-preset low \
   --profile quick
 ```
 
@@ -37,13 +35,7 @@ agent-eval run \
 ### Smoke 测试（约 10 分钟，3 个任务）
 
 ```bash
-agent-eval run --profile smoke --thinking-preset low
-```
-
-### 对比 thinking 级别
-
-```bash
-agent-eval matrix --presets low,medium,xhigh --profile quick --output results/matrix
+agent-eval run --profile smoke
 ```
 
 ### 指定任务
@@ -52,31 +44,35 @@ agent-eval matrix --presets low,medium,xhigh --profile quick --output results/ma
 agent-eval run --tasks fix_counter_bug,implement_parse_log
 ```
 
-## Thinking 配置
+## 模型 / thinking 参数
 
-Qwen3.8-27B（llama.cpp）通过顶层 `reasoning_effort` 控制：
+所有传给 `chat.completions` 的额外字段走 **`request_kwargs`**（YAML）或 **`--kwargs`**（CLI，优先级更高）。
+
+Qwen3.8-27B（llama.cpp）示例：
+
+```bash
+agent-eval run --kwargs reasoning_effort=low
+```
+
+vLLM / chat template 示例：
+
+```bash
+agent-eval run --kwargs extra_body.chat_template_kwargs.enable_thinking=True
+```
+
+也可在 [`config/default.yaml`](config/default.yaml) 中写：
+
+```yaml
+request_kwargs:
+  reasoning_effort: low
+```
+
+用 curl 验证 API 是否接受参数：
 
 ```bash
 curl http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"Qwen3.8-27B","messages":[{"role":"user","content":"hi"}],"reasoning_effort":"low"}'
-```
-
-预设定义在 [`config/default.yaml`](config/default.yaml)：
-
-| Preset | 说明 |
-|--------|------|
-| `off` | 关闭 thinking（`enable_thinking: false` fallback） |
-| `low` | `reasoning_effort: low` |
-| `medium` | `reasoning_effort: medium` |
-| `xhigh` | `reasoning_effort: xhigh` |
-| `budget_512` | `thinking_token_budget: 512` |
-
-CLI 覆盖：
-
-```bash
-agent-eval run --reasoning-effort medium
-agent-eval run --thinking-preset budget_512
 ```
 
 ## 工具模式
@@ -114,14 +110,11 @@ agent-eval list-tasks
 - **Turns**：轮次过多可能说明模型在无效重试
 - **Reasoning tokens**：thinking 开时 token 与延迟通常显著增加
 
-若 4bit 量化在 Agent 中表现差，可对比：
-1. 同模型 8bit vs 4bit
-2. `reasoning_effort` low vs off
-3. 查看 `trajectories/` 定位失败步骤（未调用工具、错误编辑、不看报错等）
+若 4bit 量化在 Agent 中表现差，可对比不同 `request_kwargs` / `--kwargs`，并查看 `trajectories/` 定位失败步骤。
 
 ## 配置
 
-编辑 [`config/default.yaml`](config/default.yaml) 设置默认 `base_url`、`model`、超时等。
+编辑 [`config/default.yaml`](config/default.yaml) 设置默认 `base_url`、`model`、`request_kwargs`、超时等。
 
 ## 许可
 

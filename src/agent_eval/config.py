@@ -71,21 +71,10 @@ def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]
 
 
 @dataclass
-class ThinkingPreset:
-    reasoning_effort: str | None = None
-    extra_body: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
 class EvalConfig:
     base_url: str = "http://localhost:8080/v1"
     model: str = "Qwen3.8-27B"
     api_key: str = "EMPTY"
-    reasoning_backend: str = "reasoning_effort"
-    thinking_presets: dict[str, ThinkingPreset] = field(default_factory=dict)
-    default_thinking_preset: str = "low"
-    thinking_preset: str | None = None
-    reasoning_effort: str | None = None
     tool_mode: str = "text"
     profile: str = "quick"
     task_ids: list[str] | None = None
@@ -100,30 +89,12 @@ class EvalConfig:
     request_kwargs: dict[str, Any] = field(default_factory=dict)
     print_api_call_file: Path | None = None
 
-    def resolved_thinking(self) -> ThinkingPreset:
-        if self.reasoning_effort is not None:
-            return ThinkingPreset(reasoning_effort=self.reasoning_effort)
-        preset_name = self.thinking_preset or self.default_thinking_preset
-        if preset_name not in self.thinking_presets:
-            raise ValueError(f"Unknown thinking preset: {preset_name}")
-        return self.thinking_presets[preset_name]
-
     def resolved_task_ids(self) -> list[str]:
         if self.task_ids:
             return self.task_ids
         if self.profile not in self.profiles:
             raise ValueError(f"Unknown profile: {self.profile}")
         return self.profiles[self.profile]
-
-
-def _parse_thinking_presets(raw: dict[str, Any]) -> dict[str, ThinkingPreset]:
-    presets: dict[str, ThinkingPreset] = {}
-    for name, value in raw.items():
-        presets[name] = ThinkingPreset(
-            reasoning_effort=value.get("reasoning_effort"),
-            extra_body=value.get("extra_body") or {},
-        )
-    return presets
 
 
 def load_config(
@@ -148,11 +119,6 @@ def load_config(
         base_url=data.get("base_url", "http://localhost:8080/v1"),
         model=data.get("model", "Qwen3.8-27B"),
         api_key=data.get("api_key", "EMPTY"),
-        reasoning_backend=data.get("reasoning_backend", "reasoning_effort"),
-        thinking_presets=_parse_thinking_presets(data.get("thinking_presets", {})),
-        default_thinking_preset=data.get("default_thinking_preset", "low"),
-        thinking_preset=data.get("thinking_preset"),
-        reasoning_effort=data.get("reasoning_effort"),
         tool_mode=data.get("tool_mode", "text"),
         profile=data.get("profile", "quick"),
         task_ids=data.get("task_ids"),

@@ -26,12 +26,13 @@ def test_tool_executor_read_write(tmp_path: Path):
     assert r.ok and r.output == "hello"
 
 
-def test_load_config_thinking_presets():
-    config = load_config()
-    assert "low" in config.thinking_presets
-    assert config.resolved_thinking().reasoning_effort == "low"
-    config2 = load_config(overrides={"thinking_preset": "xhigh"})
-    assert config2.resolved_thinking().reasoning_effort == "xhigh"
+def test_load_config_request_kwargs():
+    config = load_config(
+        overrides={
+            "request_kwargs": parse_dot_kwargs(["reasoning_effort=low"]),
+        }
+    )
+    assert config.request_kwargs["reasoning_effort"] == "low"
 
 
 def test_parse_dot_kwargs():
@@ -51,7 +52,6 @@ def test_parse_dot_kwargs():
 
 def test_request_kwargs_override_priority():
     overrides = {
-        "thinking_preset": "low",
         "request_kwargs": parse_dot_kwargs(["temperature=1", "reasoning_effort=high"]),
     }
     config = load_config(overrides=overrides)
